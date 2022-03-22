@@ -76,15 +76,16 @@ def stepgrid2(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
     return u, v, eta
 
 
-def boundary_steady(C, S):
+def boundary_steady(C, S, C0, S0):
     '''Sets the boundary conditions for the steady state and for the source and sink stage'''
     ## open water boundary
     C[-1, :] = 4.5 ## nM
     S[-1, :] = 35 ## PSU
+    
     ## Glacier wall
     C[0, :] = C[1,:]
     C[0, zz] = C0
     S[0, :] = S[1,:]
-    S[0, zz] = 0
+    S[0, zz] = S0
 
     return C, S
