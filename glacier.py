@@ -19,7 +19,7 @@ def glacier(ngridx, ngridz, dt, T):  # return eta
 
 # initialize
     u, w, rho, S, C = init0(ngridx,ngridz,ntime)
-    C,S=boundary_steady(C, S)
+    C[0,:,:],S[0,:,:]=boundary_steady(C[0,:,:], S[0,:,:],C0,S0,zz)
     return C,S
 
 
@@ -76,7 +76,7 @@ def stepgrid2(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
     return u, v, eta
 
 
-def boundary_steady(C, S, C0, S0):
+def boundary_steady(C, S, C0, S0,zz):
     '''Sets the boundary conditions for the steady state and for the source and sink stage'''
     ## open water boundary
     C[-1, :] = 4.5 ## nM
