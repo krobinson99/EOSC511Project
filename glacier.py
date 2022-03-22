@@ -4,6 +4,14 @@ import numpy as np
 def glacier(ngridx, ngridz, dt, T):  # return eta
     '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
     '''
+    g = 10 
+    D = 200           #depth of our domain in x direction [m]
+    L = 20e3          #length of our domain in x direction [m]
+    C0 = 10           # input concentration of methane NOT TRUE
+    S0 = 0            # Input concentration of salinity 
+    zz = 2 
+    dx = L/(ngridx-1)
+    dz = D/(ngridz-1)
   
 # Define our constants and dimensions
     g = 10 
@@ -20,25 +28,26 @@ def glacier(ngridx, ngridz, dt, T):  # return eta
 
 # initialize
     u, w, rho, S, C = init0(ngridx,ngridz,ntime)
+    C,S=boundary_steady(C, S)
+    return C,S
+
 
     # main loop (leap-frog)
-    for k in range(ntime):
-        u, v, eta = stepper[grid](ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap)
+    # for k in range(ntime):
+    #     u, v, eta = stepper[grid](ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap)
 
-        # add forcing
-        t = k * dt / 8640
-        eta = eta + 0.1 * (1 - np.exp(-t*t)) * spatial
+    #     # add forcing
+    #     t = k * dt / 8640
+    #     eta = eta + 0.1 * (1 - np.exp(-t*t)) * spatial
 
-        # periodic boundary conditions
-        u, v, eta = periodicbc(ngrid, u, v, eta)
+    #     # periodic boundary conditions
+    #     u, v, eta = periodicbc(ngrid, u, v, eta)
 
-        # exchange values
-        u, v, eta, up, vp, etap = exchange(u, v, eta, up, vp, etap)
+    #     # exchange values
+    #     u, v, eta, up, vp, etap = exchange(u, v, eta, up, vp, etap)
 
-    # plot contours
-    plotit(grid, ngrid, dx, x, y, u, v, eta)
 
-    return
+    #return
 
 
 def init0(ngridx,ngridz,ntime):
@@ -46,7 +55,7 @@ def init0(ngridx,ngridz,ntime):
      we need density salinity, ch4''' 
 
     u = np.zeros((ntime,ngridx, ngridz))
-    v = np.zeros_like(u)
+    w = np.zeros_like(u)
     S = np.zeros((ntime,ngridx-1, ngridz-1))
     C = np.zeros_like(S)
     rho = np.zeros_like(S)
