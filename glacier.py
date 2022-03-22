@@ -13,15 +13,6 @@ def glacier(ngridx, ngridz, dt, T):  # return eta
     dx = L/(ngridx-1)
     dz = D/(ngridz-1)
   
-# Define our constants and dimensions
-    g = 10 
-    D = 200           #depth of our domain in x direction [m]
-    L = 20e3          #length of our domain in x direction [m]
-    dx = L/(ngridx-1)
-    dz = D/(ngridz-1)
-    C0 = 10           # input concentration of methane NOT TRUE
-    S0 = 0            # Input concentration of salinity 
-    zz = 2            # Depth of glacier outflow
 
 # set up temporal scale T is total run time
     ntime = np.int(T/dt)
