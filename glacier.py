@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 
-def glacier(grid, ngrid, dt, T, small=False):  # return eta
+def glacier(ngridx, ngridz, dt, T):  # return eta
     '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
     '''
   
@@ -16,7 +16,7 @@ def glacier(grid, ngrid, dt, T, small=False):  # return eta
     ntime = np.int(T/dt)
 
 # initialize
-    u, w, rho, S, C = initial(ngridx,ngridz)
+    u, w, rho, S, C = init0(ngridx,ngridz,ntime)
 
     # main loop (leap-frog)
     for k in range(ntime):
@@ -38,17 +38,17 @@ def glacier(grid, ngrid, dt, T, small=False):  # return eta
     return
 
 
-def initialize(ngrid):
+def init0(ngridx,ngridz,ntime):
     '''initialize a ngrid x ngrid domain, u, v,, all zero 
      we need density salinity, ch4''' 
 
-    u = np.zeros((ngrid, ngrid))
+    u = np.zeros((ntime,ngridx, ngridz))
     v = np.zeros_like(u)
+    S = np.zeros((ntime,ngridx-1, ngridz-1))
+    C = np.zeros_like(S)
+    rho = np.zeros_like(S)
 
-    up = np.zeros_like(u)
-    vp = np.zeros_like(u)
-
-    return u, v, eta, up, vp, etap
+    return  u, w, rho, S, C 
 
 
 def stepgrid2(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
