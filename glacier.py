@@ -12,22 +12,11 @@ def glacier(grid, ngrid, dt, T, small=False):  # return eta
     dx = L/(ngridx-1)
     dz = D/(ngridz-1)
 
-# write out dx/dt and sqrt(g*H) for comparison
-    print('dx/dt {0:.3f}\n'.format(dx/dt))
-    print('sqrt(g*H0) {0:.3f}\n'.format(np.sqrt(g*H0)))
-    rdx = 1./dx
-
-# set up Gaussian for forcing (its a bump in the center of the domain)
-    x, y, spatial = findforcing(L, dx, ngrid)
-
 # set up temporal scale T is total run time
     ntime = np.int(T/dt)
 
 # initialize
-    u, v, eta, up, vp, etap = initial(ngrid)
-
-# set-up topography
-    Hu, Hv = find_depth[grid](H0, ngrid)
+    u, w, rho, S, C = initial(ngridx,ngridz)
 
     # main loop (leap-frog)
     for k in range(ntime):
@@ -47,19 +36,6 @@ def glacier(grid, ngrid, dt, T, small=False):  # return eta
     plotit(grid, ngrid, dx, x, y, u, v, eta)
 
     return
-
-def findforcing(L, dx, ngrid):
-    '''define a two dimensional Gaussian of forcing with half-width L'''
-    x = np.arange(0, L + 0.1*dx, dx)
-    y = x  # symmetrical case
-    spatial = np.zeros((ngrid, ngrid))
-
-    for i in range(ngrid):
-        for j in range(ngrid):
-            spatial[i,j] = np.exp(-((y[j] - L/2.) * (y[j] - L/2)
-                                    +(x[i] - L/2.) * (x[i] - L/2))
-                                    /(L*L / 48.))
-    return x, y, spatial
 
 
 def initialize(ngrid):
@@ -115,46 +91,3 @@ def periodicbc(ngrid, u, v, eta):
     v[:, -1] = v[:, 1]
 
     return u, v, eta
-
-def exchange(u, v, eta, up, vp, etap):
-    '''swap new and old values'''
-    store = np.zeros_like(vp)  # make sure store is its own array, not just another name for vp
-    store = vp
-    vp = v
-    v = store
-    store = up
-    up = u
-    u = store
-    store = etap
-    etap = eta
-    eta = store
-
-    return u, v, eta, up, vp, etap
-
-def plotit(grid, ngrid, dx, x, y, u, v, eta):
-    '''Contour plots of u, v, eta'''
-
-    shift = {1: (0, 0), 2: (0.5, 0.5), 3: (0.5, 0)}
-
-    fig, ax = plt.subplots(2,2, figsize=(10,10))
-    for i in range(2):
-        ax[1,i].set_xlabel('x (km)')
-        ax[i,0].set_ylabel('y (km)')
-    ax[0,0].set_title('$\eta$')
-    ax[0,1].set_title('velocity')
-    ax[1,0].set_title('u')
-    ax[1,1].set_title('v')
-    ax[0,0].contour(x/1000, y/1000, eta.transpose())
-    ax[1,0].contour((x + shift[grid][0] * dx)/1000,
-                  (y + shift[grid][1] * dx)/1000, u.transpose())
-    ax[1,1].contour((x + shift[grid][1] * dx)/1000,
-                  (y + shift[grid][0] * dx)/1000, v.transpose())
-
-    if grid == 3:
-        ax[0,1].quiver(x[1:]/1000., y[1:]/1000,
-                       0.5 * (u[1:,1:] + u[:-1,1:]).transpose(),
-                       0.5 * (v[1:,1:] + v[1:,:-1]).transpose())
-    else:
-        ax[0,1].quiver(x/1000, y/1000, u.transpose(), v.transpose())
-
-        
