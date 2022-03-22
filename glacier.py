@@ -1,33 +1,16 @@
 #!/usr/bin/env python
-"""Interactive One.  Initialize a Gaussian bump in surface height and allow it evolve.  Note that under
-rotational dynamics, the final steady state would be flow around the bump. If you chose the smaller domain size
-even though the Coriolis force is still included, the scale is so small, its effect is negligible"""
-
-import matplotlib.pyplot as plt
 import numpy as np
 
 def glacier(grid, ngrid, dt, T, small=False):  # return eta
-    '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours), small=False OR
-    ngrid=11, dt=4, T=90, small=True
+    '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
     '''
-
-    stepper = {1: stepgrid1, 2: stepgrid2, 3: stepgrid3}
-    find_depth = {1: find_depth1, 2: find_depth2, 3: find_depth3}
-
-# define rotation speed, gravity and depth
-    f = 1e-4
-    g = 10
-    H0 = 1000
-
-# set up spatial scale L is total domain size
-    L = 1000e3
-
-# make the domain depth and width smaller if small is True
-    if small:
-        H0 = 10
-        L = 1000
-
-    dx = L/(ngrid-1)
+  
+# Define our constants and dimensions
+    g = 10 
+    D = 200 #depth of our domain in x direction [m]
+    L = 20e3 #length of our domain in x direction [m]
+    dx = L/(ngridx-1)
+    dz = D/(ngridz-1)
 
 # write out dx/dt and sqrt(g*H) for comparison
     print('dx/dt {0:.3f}\n'.format(dx/dt))
