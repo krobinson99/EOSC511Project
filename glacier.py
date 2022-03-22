@@ -7,10 +7,13 @@ def glacier(grid, ngrid, dt, T, small=False):  # return eta
   
 # Define our constants and dimensions
     g = 10 
-    D = 200 #depth of our domain in x direction [m]
-    L = 20e3 #length of our domain in x direction [m]
+    D = 200           #depth of our domain in x direction [m]
+    L = 20e3          #length of our domain in x direction [m]
     dx = L/(ngridx-1)
     dz = D/(ngridz-1)
+    C0 = 10           # input concentration of methane NOT TRUE
+    S0 = 0            # Input concentration of salinity 
+    zz = 2            # Depth of glacier outflow
 
 # set up temporal scale T is total run time
     ntime = np.int(T/dt)
@@ -73,21 +76,15 @@ def stepgrid2(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
     return u, v, eta
 
 
-def periodicbc(ngrid, u, v, eta):
-    '''do periodic boundary conditions'''
-    eta[0, :] = eta[-2, :]
-    eta[-1, :] = eta[1, :]
-    eta[:, 0] = eta[:, -1]
-    eta[:, -1] = eta[:, 1]
+def boundary_steady(C, S):
+    '''Sets the boundary conditions for the steady state and for the source and sink stage'''
+    ## open water boundary
+    C[-1, :] = 4.5 ## nM
+    S[-1, :] = 35 ## PSU
+    ## Glacier wall
+    C[0, :] = C[1,:]
+    C[0, zz] = C0
+    S[0, :] = S[1,:]
+    S[0, zz] = 0
 
-    u[0, :] = u[-2, :]
-    u[-1, :] = u[1, :]
-    u[:, 0] = u[:, -1]
-    u[:, -1] = u[:, 1]
-
-    v[0, :] = v[-2, :]
-    v[-1, :] = v[1, :]
-    v[:, 0] = v[:, -1]
-    v[:, -1] = v[:, 1]
-
-    return u, v, eta
+    return C, S
