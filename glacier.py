@@ -8,7 +8,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     g = 10 
     D = 200            # depth of our domain in x direction [m]
     L = 20e3           # length of our domain in x direction [m]
-    C0 = 10            # input concentration of methane          NOT TRUE
+    C0 = 100            # input concentration of methane          NOT TRUE
     S0 = 0             # Input concentration of salinity 
     dx = L/(ngridx-1)
     dz = D/(ngridz-1)
@@ -78,7 +78,6 @@ def boundary_steady(C, S, C0, S0, zz):
     S[0, :] = S[1,:]
     S[0, zz] = S0
     return C,S
-    
 
 def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
     
@@ -92,10 +91,8 @@ def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
     u[0, zz] = u0
     ## open boundary
     w[-1, :] = w[-2, :]
-    u[-1, :] = w[-1, :]
-    
+    u[-1, :] = w[-1, :]  
     return C, S, u, w
-
 
 def initial_steady(C, S):
     ''' sets the inital conditions for the steady state stages'''
