@@ -5,7 +5,6 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
-   
     g = 10 
     D = 200            # depth of our domain in x direction [m]
     L = 20e3           # length of our domain in x direction [m]
