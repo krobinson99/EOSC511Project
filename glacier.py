@@ -4,7 +4,8 @@ import numpy as np
 def glacier(ngridx, ngridz, dt, T, zz, mode = 0):  # return eta
     '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
     '''
-
+    Kx=3e4
+    Kz=1e-1
     g = 10 
     D = 200           #depth of our domain in x direction [m]
     L = 20e3          #length of our domain in x direction [m]
@@ -12,40 +13,55 @@ def glacier(ngridx, ngridz, dt, T, zz, mode = 0):  # return eta
     S0 = 0            # Input concentration of salinity 
     dx = L/(ngridx-1)
     dz = D/(ngridz-1)
-    zz = np.int(zz/dz)
+    zz = int(zz/dz)
 
 # set up temporal scale T is total run time
-    ntime = np.int(T/dt)
+    ntime = int(T/dt)
     #S, C = init0(ngridx,ngridz,ntime,mode)
     #C[0,:,:],S[0,:,:]=boundary_steady(C[0,:,:], S[0,:,:],C0,S0,zz) #this line is not needed, just to check output
     if mode==0:
-        # initialize
-        S, C = init0(ngridx,ngridz,ntime,mode)
-        #S, C = initial_steady(S,C)
+    # initialize
+        C, S = init0(ngridx,ngridz,ntime,mode)
+        C[0,:,:], S[0,:,:] = initial_steady(C[0,:,:],S[0,:,:])
+        C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz)
     # main loop (Euler forward)
-        for nt in range(ntime):
-            C[nt,:,:], S[nt,:,:] = stepper_steady(ngrid,dx,dz,dt,C,S,Kx,Kz)
+        for nt in range(1,ntime):
+            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz)
     # periodic boundary conditions
-            C[nt,:,:], S[nt,:,:] = boundary_steady(C, S, C0, S0,zz)
+            C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz)
         return C,S
 
 
 def init0(ngridx,ngridz,ntime,mode):
     '''initialize a ngrid x ngrid domain, u, v,, all zero 
      we need density salinity, ch4''' 
-    S = np.zeros((ntime,ngridx-1, ngridz-1))
+    S = np.zeros((ntime,ngridx, ngridz))
     C = np.zeros_like(S)
     if mode==1:
-        u = np.zeros((ntime,ngridx, ngridz))
-        w = np.zeros_like(u)
+        u = np.zeros_like(S)
+        w = np.zeros_like(S)
         rho = np.zeros_like(S)
         return  u, w, rho, S, C 
     else:
-        return  S, C 
+        return  C, S 
 
-def stepper_steady(ngrid,dx,dz,dt,C,S,Kx,Kz):
+def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2))
+    Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
+    return Cn,Sn
 
-
+def diffx(C):
+    Cdx=np.zeros_like(C)
+    for i in range(C.shape[0]-1):
+        for j in range(C.shape[1]-1):
+            Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
+    return Cdx
+def diffz(C):
+    Cdz=np.zeros_like(C)
+    for i in range(C.shape[0]-1):
+        for j in range(C.shape[1]-1):
+            Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]
+    return Cdz
 
 
 def boundary_steady(C, S, C0, S0,zz):
@@ -58,6 +74,13 @@ def boundary_steady(C, S, C0, S0,zz):
     C[0, zz] = C0
     S[0, :] = S[1,:]
     S[0, zz] = S0
+    return C, S
+
+def initial_steady(C,S):
+    '''Sets the boundary conditions for the steady state and for the source and sink stage'''
+    ## open water boundary
+    C[1:-1,:] = 4.5 ## nM
+    S[1:-1,:] = 35 ## PSU 
     return C, S
 
 
