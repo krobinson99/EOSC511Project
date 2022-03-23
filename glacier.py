@@ -3,15 +3,11 @@ import numpy as np
 
 <<<<<<< HEAD
 def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
-=======
-def glacier(ngridx, ngridz, dt, T, zz, mode = 0):  # return eta
->>>>>>> 7acf0d8f0aa8e7e828f32d9ce4df70d2c56eb4fe
     '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
 
     g = 10 
-<<<<<<< HEAD
     D = 200            # depth of our domain in x direction [m]
     L = 20e3           # length of our domain in x direction [m]
     C0 = 10            # input concentration of methane          NOT TRUE
@@ -107,9 +103,6 @@ def stepper_steady(ngrid,dx,dz,dt,C,S,Kx,Kz):
 def boundaries(C, S, u, w, uo, C0, S0, zz, D, motion):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
 =======
-def boundary_steady(C, S, C0, S0,zz):
-    '''Sets the boundary conditions for the steady state and for the source and sink stage'''
->>>>>>> 7acf0d8f0aa8e7e828f32d9ce4df70d2c56eb4fe
     ## open water boundary
     C[-1, :] = 4.5 ## nM
     S[-1, :] = 35 ## PSU 
