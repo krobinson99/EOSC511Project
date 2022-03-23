@@ -5,8 +5,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
-    Kx=3e4
-    Kz=1e-1
+   
     g = 10 
     D = 200            # depth of our domain in x direction [m]
     L = 20e3           # length of our domain in x direction [m]
@@ -16,7 +15,8 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     dz = D/(ngridz-1)
     u0 = 0             # Input velocity of FW plume              NEEDS A REAL VALUE
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
-
+    Kx= 5 * L/dx
+    Kz= 1e-4 * D/dz
 
 # set up temporal scale T is total run time
     ntime = int(T/dt)
