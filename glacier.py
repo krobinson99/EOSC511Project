@@ -16,6 +16,9 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
+    Ro = 1.2e-9 * T/dt    # Oxidation rate (1e-4 nM/day = 1e-4/(24*60*60) nM/s), Setting this up to be the same rate everywhere, could change                            later to be a profile (Higher oxidation rates near the surface, decreasing with depth).
+
+    
 
 # set up temporal scale T is total run time
     ntime = int(T/dt)
@@ -28,7 +31,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
         C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz)
     # main loop (Euler forward)
         for nt in range(1,ntime):
-            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz)
+            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,Ro)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz)
         return C,S
@@ -46,9 +49,10 @@ def init0(ngridx,ngridz,ntime,motion):
         return  u, w, rho, S, C 
     else:
         return  C, S 
+    
 
-def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2))
+def stepper_steady(dx,dz,dt,C,S,Kx,Kz,Ro):
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-Ro*diffx(C)-Ro*diffz(C))
     Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
     return Cn,Sn
 
@@ -58,13 +62,13 @@ def diffx(C):
         for j in range(C.shape[1]-1):
             Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
     return Cdx
+
 def diffz(C):
     Cdz=np.zeros_like(C)
     for i in range(C.shape[0]-1):
         for j in range(C.shape[1]-1):
             Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]
     return Cdz
-
 
 
 def boundary_steady(C, S, C0, S0, zz):
