@@ -2,7 +2,7 @@
 import numpy as np
 
 def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
-    '''recommended values ngrid=11, dt=150, T=4*3600 (4 hours)???? CHANGE FOR OUR PROJECT
+    '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
     g = 10 
@@ -16,6 +16,11 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
+    Ro =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
+    k =          # Gas exchange rate constant (s^-1)
+
+    
+    
 
 # set up temporal scale T is total run time
     ntime = int(T/dt)
@@ -28,7 +33,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
         C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz)
     # main loop (Euler forward)
         for nt in range(1,ntime):
-            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz)
+            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,Ro)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz)
         return C,S
@@ -46,9 +51,10 @@ def init0(ngridx,ngridz,ntime,motion):
         return  u, w, rho, S, C 
     else:
         return  C, S 
+    
 
-def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2))
+def stepper_steady(dx,dz,dt,C,S,Kx,Kz,Ro):
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-Ro*C)
     Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
     return Cn,Sn
 
@@ -58,14 +64,13 @@ def diffx(C):
         for j in range(C.shape[1]-1):
             Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
     return Cdx
+
 def diffz(C):
     Cdz=np.zeros_like(C)
     for i in range(C.shape[0]-1):
         for j in range(C.shape[1]-1):
             Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]
     return Cdz
-
-
 
 def boundary_steady(C, S, C0, S0, zz):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
@@ -80,7 +85,6 @@ def boundary_steady(C, S, C0, S0, zz):
     return C,S
 
 def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
-    
     C, S = boundary_steady(C, S, C0, S0, zz)
     ## Surface and depth boundary
     w[:, 0] = w[:, D] = 0
@@ -96,8 +100,8 @@ def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
 
 def initial_steady(C, S):
     ''' sets the inital conditions for the steady state stages'''
-    C  = 4.5*C
-    S = 35*S
+    C  = 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM
+    S = 33*S # Changed to 33 from 35, closest to actual environmental conditions
     return C, S
 
 def inital_motion(C, S, u, w):
@@ -105,8 +109,6 @@ def inital_motion(C, S, u, w):
     C, S = initial_steady(C, S)       ## A placeholder until we have a steady field solution. maybe use the steady state stepper
     u, w = 0                          ## should be set when creating grids anyway
     return C, S
-
-
 
 
 
