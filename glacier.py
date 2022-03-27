@@ -56,7 +56,7 @@ def init0(ngridx,ngridz,ntime,motion):
     
 
 def stepper_steady(dx,dz,dt,C,S,Kx,Kz,Ro,Kd):
-    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2))#-Ro*C)
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-Ro*C)
     #Cn = np.zeros_like(S)
     #Cn[:,1:-1] = C[:,1:-1] + dt*(diffx(C[:,1:-1])*Kx/(dx**2)+Kz*diffz(C[:,1:-1])/(dz**2)-Ro*C[:,1:-1])
     #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
