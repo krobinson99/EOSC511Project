@@ -17,7 +17,9 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
     Ro =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
-    k =          # Gas exchange rate constant (s^-1)
+    mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
+    Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
+    #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
 
     
     
@@ -33,7 +35,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
         C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz)
     # main loop (Euler forward)
         for nt in range(1,ntime):
-            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,Ro)
+            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,Ro,Kd)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz)
         return C,S
@@ -53,8 +55,11 @@ def init0(ngridx,ngridz,ntime,motion):
         return  C, S 
     
 
-def stepper_steady(dx,dz,dt,C,S,Kx,Kz,Ro):
+def stepper_steady(dx,dz,dt,C,S,Kx,Kz,Ro,Kd):
     Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-Ro*C)
+    #Cn = np.zeros_like(S)
+    #Cn[:,1:-1] = C[:,1:-1] + dt*(diffx(C[:,1:-1])*Kx/(dx**2)+Kz*diffz(C[:,1:-1])/(dz**2)-Ro*C[:,1:-1])
+    #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
     Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
     return Cn,Sn
 
@@ -63,6 +68,9 @@ def diffx(C):
     for i in range(C.shape[0]-1):
         for j in range(C.shape[1]-1):
             Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
+            #v1 = np.ones(C.shape[1])
+            #operater_x = np.diag(v,k) + np.diag(v1,k1) + np.diag(v2,k2) #If v is a 1-D array, return a 2-D array with v on the k-th diagonal.
+            #Cdx = C*operater_x
     return Cdx
 
 def diffz(C):
@@ -75,8 +83,9 @@ def diffz(C):
 def boundary_steady(C, S, C0, S0, zz):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
     ## open water boundary
-    C[-1, :] = 4.5 ## nM
-    S[-1, :] = 35 ## PSU 
+    C[-1, :] = 3.7 ## nM
+    S[-1, :] = 33 ## PSU
+    
     ## Glacier wall
     C[0, :] = C[1,:]
     C[0, zz] = C0
