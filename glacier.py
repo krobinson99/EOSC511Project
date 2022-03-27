@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 import numpy as np
 
-def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
+def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # return eta
     '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
     g = 10 
     D = 200            # depth of our domain in x direction [m]
     L = 20e3           # length of our domain in x direction [m]
-    C0 = 100            # input concentration of methane          NOT TRUE
+    C0 = 10            # input concentration of methane          NOT TRUE
     S0 = 0             # Input concentration of salinity 
     dx = L/(ngridx-1)
     dz = D/(ngridz-1)
@@ -16,7 +16,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
-    Ro =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
+    alpha =  0.12/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
     mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
     Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
     #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
@@ -35,9 +35,13 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
         C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz)
     # main loop (Euler forward)
         for nt in range(1,ntime):
-            C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,Ro,Kd)
+            if steady:
+                C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz)
+            else:
+                C[nt,:,:], S[nt,:,:] = stepper_sink(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,alpha,Kd, ngridz)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz)
+        C = C+3.7
         return C,S
 
 
@@ -55,11 +59,8 @@ def init0(ngridx,ngridz,ntime,motion):
         return  C, S 
     
 
-def stepper_steady(dx,dz,dt,C,S,Kx,Kz,Ro,Kd):
-    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-Ro*C)
-    #Cn = np.zeros_like(S)
-    #Cn[:,1:-1] = C[:,1:-1] + dt*(diffx(C[:,1:-1])*Kx/(dx**2)+Kz*diffz(C[:,1:-1])/(dz**2)-Ro*C[:,1:-1])
-    #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
+def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2))
     Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
     return Cn,Sn
 
@@ -83,8 +84,8 @@ def diffz(C):
 def boundary_steady(C, S, C0, S0, zz):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
     ## open water boundary
-    C[-1, :] = 3.7 ## nM
-    S[-1, :] = 33 ## PSU
+    C[-1, :] = C[-2,:] ## nM
+    S[-1, :] = 33 ## PSU a function for S with depth 
     
     ## Glacier wall
     C[0, :] = C[1,:]
@@ -109,7 +110,7 @@ def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
 
 def initial_steady(C, S):
     ''' sets the inital conditions for the steady state stages'''
-    C  = 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM
+    C  = 0*C ## 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM
     S = 33*S # Changed to 33 from 35, closest to actual environmental conditions
     return C, S
 
@@ -119,7 +120,14 @@ def inital_motion(C, S, u, w):
     u, w = 0                          ## should be set when creating grids anyway
     return C, S
 
-
+def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd, ngrid,):
+    ML = 10
+    Dp = int(ML/(ngrid-1))   ## space step closest to mixing layer for MLayer = 20m
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-alpha*C)
+    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
+    #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
+    Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
+    return Cn,Sn
 
 # def stepgridB(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
 #     '''take a step forward using grid 2 (B)'''
