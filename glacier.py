@@ -16,7 +16,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False):  # return eta
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
-    Ro = 1.2e-9 * T/dt    # Oxidation rate (1e-4 nM/day = 1e-4/(24*60*60) nM/s), Setting this up to be the same rate everywhere, could change                            later to be a profile (Higher oxidation rates near the surface, decreasing with depth).
+    Ro =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
 
     
 
@@ -52,7 +52,7 @@ def init0(ngridx,ngridz,ntime,motion):
     
 
 def stepper_steady(dx,dz,dt,C,S,Kx,Kz,Ro):
-    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-Ro*diffx(C)-Ro*diffz(C))
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-Ro*C)
     Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
     return Cn,Sn
 
