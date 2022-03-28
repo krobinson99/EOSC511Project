@@ -20,9 +20,8 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # re
     mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
     Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
     #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
-
-    
-    
+    zn = np.linspace(0,D,ngridz)
+    Sop = 33 + np.log(1e-3+zn/D)
 
 # set up temporal scale T is total run time
     ntime = int(T/dt)
@@ -31,8 +30,8 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # re
     if motion==False:
     # initialize
         C, S = init0(ngridx,ngridz,ntime,motion)
-        C[0,:,:], S[0,:,:] = initial_steady(C[0,:,:],S[0,:,:])
-        C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz)
+        C[0,:,:], S[0,:,:] = initial_steady(C[0,:,:],S[0,:,:],Sop)
+        C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz,Sop)
     # main loop (Euler forward)
         for nt in range(1,ntime):
             if steady:
@@ -40,7 +39,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # re
             else:
                 C[nt,:,:], S[nt,:,:] = stepper_sink(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,alpha,Kd, ngridz)
     # periodic boundary conditions
-            C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz)
+            C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz,Sop)
         C = C+3.7
         return C,S
 
@@ -57,12 +56,6 @@ def init0(ngridx,ngridz,ntime,motion):
         return  u, w, rho, S, C 
     else:
         return  C, S 
-    
-
-def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2))
-    Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
-    return Cn,Sn
 
 def diffx(C):
     Cdx=np.zeros_like(C)
@@ -81,11 +74,11 @@ def diffz(C):
             Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]
     return Cdz
 
-def boundary_steady(C, S, C0, S0, zz):
+def boundary_steady(C, S, C0, S0, zz,Sop):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
     ## open water boundary
     C[-1, :] = C[-2,:] ## nM
-    S[-1, :] = 33 ## PSU a function for S with depth 
+    S[-1, :] = Sop ## PSU a function for S with depth 
     
     ## Glacier wall
     C[0, :] = C[1,:]
@@ -108,10 +101,12 @@ def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
     u[-1, :] = w[-1, :]  
     return C, S, u, w
 
-def initial_steady(C, S):
+def initial_steady(C, S,Sop):
     ''' sets the inital conditions for the steady state stages'''
-    C  = 0*C ## 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM
-    S = 33*S # Changed to 33 from 35, closest to actual environmental conditions
+    C  = 0*C ## 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM  
+    for i in range(S.shape[0]):
+        S[i,:] = Sop # Changed to 33 from 35, closest to actual environmental conditions
+    
     return C, S
 
 def inital_motion(C, S, u, w):
@@ -119,6 +114,11 @@ def inital_motion(C, S, u, w):
     C, S = initial_steady(C, S)       ## A placeholder until we have a steady field solution. maybe use the steady state stepper
     u, w = 0                          ## should be set when creating grids anyway
     return C, S
+    
+def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2))
+    Sn = S + dt*(diffx(S)*Kx/(dx**2)+Kz*diffz(S)/(dz**2))
+    return Cn,Sn
 
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd, ngrid,):
     ML = 10
