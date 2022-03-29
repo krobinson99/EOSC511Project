@@ -22,6 +22,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # re
     #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
     zn = np.linspace(0,D,ngridz)
     Sop = 33 + np.log(1e-3+zn/D)
+    Cop = 3.7
 
 # set up temporal scale T is total run time
     ntime = int(T/dt)
@@ -38,7 +39,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # re
                 C[nt,:,:], S[nt,:,:] = stepper_sink(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,alpha,Kd,ngridz)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz,Sop)
-        C = C+3.7
+        C = C + Cop
         return C,S
 
 
@@ -79,12 +80,12 @@ def diffz(C,dz):
                 Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]    
     return Cdz
 
-def boundary_steady(C, S, C0, S0, zz,Sop):
+def boundary_steady(C, S, C0, S0, zz ,Sop):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
     ## open water boundary
     C[-1, :] = C[-2,:] ## nM
     S[-1, :] = Sop ## PSU a function for S with depth 
-    
+
     ## Glacier wall
     C[0, :] = C[1,:]
     C[0, zz] = C0
@@ -111,7 +112,6 @@ def initial_steady(C, S,Sop):
     C  = 0*C ## 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM  
     for i in range(S.shape[0]):
         S[i,:] = Sop # Changed to 33 from 35, closest to actual environmental conditions
-    
     return C, S
 
 def inital_motion(C, S, u, w):
