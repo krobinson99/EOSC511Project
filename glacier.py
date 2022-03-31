@@ -68,6 +68,25 @@ def diffx(C,dx):
                 Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
     return Cdx
 
+def diffx2(C): # Needs an equivalent diffdz2.
+    n   = C.shape[0];
+    e   = np.ones([1,n])
+    dat = np.vstack((e,-2*e,e))
+    diags = np.array([-1,0,1])
+    A   = spdiags(dat, diags, n, n).tolil() # Use .toarray() if you want the full matrix
+    
+    # Sets simple forward and backward difference scheme at end points, change as needed w/ BCs
+    A[0,0:3] = [1, -2, 1]
+    A[-1,-3::] = [1, -2, 1]
+
+    # == Just some checks - delete this stuff if you're happy with it ===
+    print(A[0:5,0:5].toarray())
+    print(A[-6::,-5::].toarray())
+    # =======
+
+    Cdx = A*C
+    return Cdx
+
 def diffz(C,dz):
     Cdz=np.zeros_like(C)
     for i in range(C.shape[0]):
