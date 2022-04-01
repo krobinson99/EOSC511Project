@@ -73,18 +73,14 @@ def diffx2(C):
     e   = np.ones([1,n])
     dat = np.vstack((e,-2*e,e))
     diags = np.array([-1,0,1])
-    A   = spdiags(dat, diags, n, n).tolil() # Use .toarray() if you want the full matrix
+    A   = spdiags(dat, diags, n, n).toarray()
     
     # Sets simple forward and backward difference scheme at end points, change as needed w/ BCs
     A[0,0:3] = [1, -2, 1]
     A[-1,-3::] = [1, -2, 1]
 
-    # == Just some checks - delete this stuff if you're happy with it ===
-    print(A[0:5,0:5].toarray())
-    print(A[-6::,-5::].toarray())
-    # =======
 
-    Cdx = A*C
+    Cdx = A@C
     return Cdx
 
 def diffz(C,dz):
@@ -97,6 +93,22 @@ def diffz(C,dz):
                 Cdz[i,j]= (dz**2) * (2*C[i,j] - 5*C[i,j-1] + 4*C[i,j-2] - C[i,j-3])/(dz**3)
             else:
                 Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]    
+    return Cdz
+
+def diffz2(C): 
+    n   = C.shape[1];
+    e   = np.ones([1,n])
+    dat = np.vstack((e,-2*e,e))
+    diags = np.array([-1,0,1])
+    A   = spdiags(dat, diags, n, n).toarray()
+    
+    # Sets simple forward and backward difference scheme at end points, change as needed w/ BCs
+    A[0,0:3] = [1, -2, 1]
+    A[-1,-3::] = [1, -2, 1]
+
+
+    Cdz = A@C.transpose()
+    Cdz = Cdz.transpose()
     return Cdz
 
 def boundary_steady(C, S, C0, S0, zz ,Sop):
