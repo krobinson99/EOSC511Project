@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 import numpy as np
-from scipy.sparse import spdiags
 
 def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # return eta
     '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
-    if steady = False sinks case stepper used
     '''
     g = 10 
     D = 200            # depth of our domain in x direction [m]
@@ -18,7 +16,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # re
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
-    alpha =  0.1/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
+    alpha =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
     mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
     Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
     #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
@@ -48,13 +46,12 @@ def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # re
 def init0(ngridx,ngridz,ntime,motion):
     '''initialize a ngrid x ngrid domain, u, v,, all zero 
      we need density salinity, ch4''' 
-    S = np.ones((ntime,ngridx+1, ngridz+1))
+    S = np.ones((ntime,ngridx, ngridz))
     C = np.ones_like(S)
     if motion:
-        u = np.zeros((ntime,ngridx, ngridz))
-        w = np.zeros_like(u)
+        u = np.zeros_like(S)
+        w = np.zeros_like(S)
         rho = np.zeros_like(S)
-        grho = np.zeros_like(u)
         return  u, w, rho, S, C 
     else:
         return  C, S 
@@ -106,7 +103,7 @@ def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
     u[:, 0] = u[:, 1]
     ## Wall boundary
     w[0, :] = u[0, :] = 0
-    u[0, zz] = uo
+    u[0, zz] = u0
     ## open boundary
     w[-1, :] = w[-2, :]
     u[-1, :] = w[-1, :]  
@@ -126,20 +123,17 @@ def inital_motion(C, S, u, w):
     return C, S
     
 def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    #Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2))
-    #Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
-    Cn = C + dt*(diffx2(C)*Kx/(dx**2)+Kz*diffz2(C)/(dz**2))
-    Sn = S + dt*(diffx2(S)*Kx/(dx**2)+Kz*diffz2(S)/(dz**2))
+    Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2))
+    Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
     return Cn,Sn
 
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz):
     ML = 10
-    Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer 
-    #Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-alpha*C)
-    Cn = C + dt*(diffx2(C)*Kx/(dx**2)+Kz*diffz2(C)/(dz**2)-alpha*C)
-    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) 
-    #Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
-    Sn = S + dt*(diffx2(S)*Kx/(dx**2)+Kz*diffz2(S)/(dz**2))
+    Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
+    Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2)-alpha*C)
+    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
+    #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
+    Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
     return Cn,Sn
 
 # def stepgridB(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
@@ -162,3 +156,4 @@ def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz):
 #                                                          + Hv[0:nm2, 1:nm1] * vp[0:nm2, 1:nm1]
 #                                                          - Hv[0:nm2, 0:nm2] * vp[0:nm2, 0:nm2]) * 0.5 * rdx)
 #     return u, v, eta
+
