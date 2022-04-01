@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 
-def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # return eta
+def glacier(ngridx, ngridz, dt, zinput, T, ML, motion = False, steady = True):  # return eta
     '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
@@ -127,8 +127,7 @@ def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
     Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
     return Cn,Sn
 
-def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz):
-    ML = 10
+def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
     Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
     Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2)-alpha*C)
     Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
