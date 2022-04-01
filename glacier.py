@@ -124,6 +124,19 @@ def inital_motion(C, S, u, w):
     C, S = initial_steady(C, S)       ## A placeholder until we have a steady field solution. maybe use the steady state stepper
     u, w = 0                          ## should be set when creating grids anyway
     return C, S
+
+def rhofunc(S, z):
+    a0 = 1.665e-1
+    b0 = 7.6554e-1
+    lamb1 = 5.952e-2
+    lamb2 = 5.4914e-4
+    eta= 2.4341e-3
+    mu1 = 1.496e-4
+    mu2 = 1.109e-5
+    Ta = -9             ## C
+    Sa = S - 35         ## PSU
+    rho0 = 1026         ## kg/m3
+    return (1/rho0*((-a0)*(1+0.5*lamb1*Ta + mu1*z)*Ta+ b0*(1 - 0.5*lamb2*Sa - mu2*z)*Sa - eta*Ta*Sa))
     
 def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
     Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2))
