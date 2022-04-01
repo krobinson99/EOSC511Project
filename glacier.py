@@ -68,7 +68,7 @@ def diffx(C,dx):
                 Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
     return Cdx
 
-def diffx2(C): # Needs an equivalent diffdz2.
+def diffx2(C): 
     n   = C.shape[0];
     e   = np.ones([1,n])
     dat = np.vstack((e,-2*e,e))
