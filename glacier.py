@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.sparse import spdiags
 
-def glacier(ngridx, ngridz, dt, zinput, T, ML, motion = False, steady = True):  # return eta
+def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = True):  # return eta
     '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
@@ -17,7 +17,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, motion = False, steady = True):  
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
-    alpha =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
+    #alpha =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
     mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
     Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
     #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
