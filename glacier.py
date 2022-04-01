@@ -56,28 +56,33 @@ def init0(ngridx,ngridz,ntime,motion):
     else:
         return  C, S 
 
-def diffx(C,dx):
-    Cdx=np.zeros_like(C)
-    for i in range(C.shape[0]):
-        for j in range(C.shape[1]):
-            if i==0:
-                Cdx[i,j]= (dx**2) * (2*C[i,j] - 5*C[i+1,j] + 4*C[i+2,j] - C[i+3,j])/(dx**3)
-            elif i==C.shape[0]-1:
-                Cdx[i,j]= (dx**2) * (2*C[i,j] - 5*C[i-1,j] + 4*C[i-2,j] - C[i-3,j])/(dx**3)
-            else:
-                Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
+def diffx(C, dx): 
+    n   = C.shape[0];
+    e   = np.ones([1,n])
+    dat = np.vstack((e,-2*e,e))/(dx**2)# Centered difference approximation, second derivative.
+    diags = np.array([-1,0,1])
+    A = spdiags(dat, diags, n, n).toarray()
+    
+    # Sets simple forward and backward difference scheme at end points, change as needed w/ BCs
+    A[0,0:4] = np.array([2, -5, 4, -1])*(dx**2)/(dx**3) # Forward difference approximation, second derivative
+    A[-1,-4::] = np.array([-1, 4, -5, 2])*(dx**2)/(dx**3) # Backward difference approximation, second derivative.
+
+    Cdx = A@C
     return Cdx
 
-def diffz(C,dz):
-    Cdz=np.zeros_like(C)
-    for i in range(C.shape[0]):
-        for j in range(C.shape[1]):
-            if j==0:
-                Cdz[i,j]= (dz**2) * (2*C[i,j] - 5*C[i,j+1] + 4*C[i,j+2] - C[i,j+3])/(dz**3)
-            elif j==C.shape[1]-1:
-                Cdz[i,j]= (dz**2) * (2*C[i,j] - 5*C[i,j-1] + 4*C[i,j-2] - C[i,j-3])/(dz**3)
-            else:
-                Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]    
+def diffz(C,dz): 
+    n   = C.shape[1];
+    e   = np.ones([1,n])
+    dat = np.vstack((e,-2*e,e))/(dz**2) # Centered difference, second derivative
+    diags = np.array([-1,0,1])
+    A   = spdiags(dat, diags, n, n).toarray()
+    
+    # Sets simple forward and backward difference scheme at end points, change as needed w/ BCs
+    A[0,0:4] = np.array([2, -5, 4, -1])/(dz**3) # Forward difference approximation, second derivative
+    A[-1,-4::] = np.array([-1, 4, -5, 2])/(dz**3) # Backward difference approximation, second derivative.
+
+    Cdz = A@C.transpose()
+    Cdz = Cdz.transpose()
     return Cdz
 
 def boundary_steady(C, S, C0, S0, zz ,Sop):
@@ -121,16 +126,17 @@ def inital_motion(C, S, u, w):
     return C, S
     
 def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2))
-    Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
+    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz))
+    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
 
-def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
+def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz):
+    ML = 10
     Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
-    Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2)-alpha*C)
+    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C)
     Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
     #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
-    Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
+    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
 
 # def stepgridB(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
