@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.sparse import spdiags
 
-def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # return eta
+def glacier(ngridx, ngridz, dt, zinput, T, ML, motion = False, steady = True):  # return eta
     '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     if steady = False sinks case stepper used
@@ -143,11 +143,11 @@ def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
     Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
     return Cn,Sn
 
-def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz):
-    ML = 10
-    Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer 
-    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-alpha*C)
-    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) 
+def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
+    Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
+    Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2)-alpha*C)
+    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
+    #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
     Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
     return Cn,Sn
 
