@@ -68,7 +68,6 @@ def diffx(C,dx):
                 Cdx[i,j]=C[i+1,j]-2*C[i,j]+C[i-1,j]
     return Cdx
 
-
 def diffz(C,dz):
     Cdz=np.zeros_like(C)
     for i in range(C.shape[0]):
@@ -80,7 +79,6 @@ def diffz(C,dz):
             else:
                 Cdz[i,j]=C[i,j+1]-2*C[i,j]+C[i,j-1]    
     return Cdz
-
 
 def boundary_steady(C, S, C0, S0, zz ,Sop):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
