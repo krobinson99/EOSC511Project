@@ -4,6 +4,7 @@ import numpy as np
 def glacier(ngridx, ngridz, dt, zinput, T, motion = False, steady = True):  # return eta
     '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
+    if steady = False sinks case stepper used
     '''
     g = 10 
     D = 200            # depth of our domain in x direction [m]
@@ -127,7 +128,7 @@ def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
 
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngrid):
     ML = 10
-    Dp = int(ML/(ngrid-1))   ## space step closest to mixing layer for MLayer = 20m
+    Dp = int(ML/(ngrid-1))   ## space step closest to mixing layer for MLayer
     Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2)-alpha*C)
     Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
     #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
