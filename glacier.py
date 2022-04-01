@@ -126,20 +126,16 @@ def inital_motion(C, S, u, w):
     return C, S
     
 def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    #Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2))
-    #Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
-    Cn = C + dt*(diffx2(C)*Kx/(dx**2)+Kz*diffz2(C)/(dz**2))
-    Sn = S + dt*(diffx2(S)*Kx/(dx**2)+Kz*diffz2(S)/(dz**2))
+    Cn = C + dt*(diffx(C,dx)*Kx/(dx**2)+Kz*diffz(C,dz)/(dz**2))
+    Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
     return Cn,Sn
 
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz):
     ML = 10
     Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer 
-    #Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-alpha*C)
-    Cn = C + dt*(diffx2(C)*Kx/(dx**2)+Kz*diffz2(C)/(dz**2)-alpha*C)
+    Cn = C + dt*(diffx(C)*Kx/(dx**2)+Kz*diffz(C)/(dz**2)-alpha*C)
     Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) 
-    #Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
-    Sn = S + dt*(diffx2(S)*Kx/(dx**2)+Kz*diffz2(S)/(dz**2))
+    Sn = S + dt*(diffx(S,dx)*Kx/(dx**2)+Kz*diffz(S,dz)/(dz**2))
     return Cn,Sn
 
 # def stepgridB(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
