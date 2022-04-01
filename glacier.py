@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
+from scipy.sparse import spdiags
 
 def glacier(ngridx, ngridz, dt, zinput, T, ML, motion = False, steady = True):  # return eta
     '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
@@ -130,7 +131,7 @@ def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
     Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
 
-def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz):
+def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
     ML = 10
     Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
     Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C)
