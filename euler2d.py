@@ -1,9 +1,5 @@
-##This code helps to compare three different mathematical schemes for numerical modeling of a concentration C advection (last stepspace of the domain conected to first)
-###COMMENT(select and ctrl+3) A SHCEME WHEN NOT USING AND UNCOMMENT(ctrl+4) TO USE (from line 63)  
-##Changing the timestep(dt) will affect on the performance of the model (line:14)
 import numpy as np
 import matplotlib.pyplot as plt
-import math
 import ffmpeg
 from numpy import random
 from matplotlib import animation
@@ -46,19 +42,18 @@ def lax(ca,c,cs,uj):
     cf = c - dt*(uj*(cs - ca)/(2*dx)) + dt*((uj**2)*(dt/2)*(cs -2*c + ca)/(dx**2))
     return cf
 
-
 ######################################
 
 ###############  UNCOMMENT TO USE EULER SCHEME ###############
 
-# for n in range(0,tmax-1):
-#     for i in range(0,N-1):
-#         for j in range(0,M):
-#             if U[i,j]>=0:
-#                 C[n+1,i,j] = upstr(C[n,i,j],C[n,i-1,j],U[i,j])
-#             else:
-#                 C[n+1,i,j] = upstr(C[n,i,j],C[n,i+1,j],U[i,j])
-# titulo=str('Concentration advection computed with Euler Math.Scheme')
+for n in range(0,tmax-1):
+    for i in range(0,N-1):
+        for j in range(0,M):
+            if U[i,j]>=0:
+                C[n+1,i,j] = upstr(C[n,i,j],C[n,i-1,j],U[i,j])
+            else:
+                C[n+1,i,j] = upstr(C[n,i,j],C[n,i+1,j],U[i,j])
+titulo=str('Concentration advection computed with Euler Math.Scheme')
 
 ##############  UNCOMMENT TO USE LAX SCHEME  ###############
 
