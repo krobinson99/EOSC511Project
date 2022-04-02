@@ -30,7 +30,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
     if motion==False:
     # initialize
         C, S = init0(ngridx,ngridz,ntime,motion)
-        C[0,:,:], S[0,:,:] = initial_steady(C[0,:,:],S[0,:,:],Sop)
+        S[0,:,:] = initial(S[0,:,:],Sop)
         C[0,:,:], S[0,:,:] = boundary_steady(C[0,:,:], S[0,:,:], C0, S0,zz,Sop)
     # main loop (Euler forward)
         for nt in range(1,ntime):
@@ -42,20 +42,86 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
             C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz,Sop)
         C = C + Cop
         return C,S
+    if motion:
+    # initialize
+        u, w, rho, S, C  = init0(ngridx,ngridz,ntime,motion)
+        S[0,:,:] = initial(S[0,:,:],Sop)
+        C[0,:,:], S[0,:,:], u[0,:,:], w[0,:,:] = boundary_motion(C[0,:,:], S[0,:,:],u[0,:,:], w[0,:,:], u0, C0, S0, zz, D, Sop)
+        # main loop (Euler forward)
+        for nt in range(1,ntime):
+            if steady:
+                C[nt,:,:], S[nt,:,:] = stepper_motion(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:])
+            C[nt,:,:], S[nt,:,:], u[nt,:,:], w[nt,:,:] = boundary_motion(C[nt,:,:], S[nt,:,:],u[nt,:,:], w[nt,:,:], u0, C0, S0, zz, D, Sop)
+        C = C + Cop
+        return C,S
 
 
 def init0(ngridx,ngridz,ntime,motion):
-    '''initialize a ngrid x ngrid domain, u, v,, all zero 
+    '''initialize a ngrid x ngrid domain, u, v, all zero 
      we need density salinity, ch4''' 
     S = np.ones((ntime,ngridx, ngridz))
-    C = np.ones_like(S)
+    C = np.zeros_like(S)
     if motion:
-        u = np.zeros_like(S)
-        w = np.zeros_like(S)
+        u = 0.3*np.ones_like(S)
+        w = 0.01*np.ones_like(S)
         rho = np.zeros_like(S)
         return  u, w, rho, S, C 
     else:
         return  C, S 
+    
+def initial(S,Sop):
+    ''' sets the inital conditions for the steady state stages'''
+    #C  = 0*C ## 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM  
+    for i in range(S.shape[0]):
+        S[i,:] = Sop # Changed to 33 from 35, closest to actual environmental conditions
+    return S
+
+
+def boundary_steady(C, S, C0, S0, zz ,Sop):
+    '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
+    ## open water boundary
+    C[-1, :] = C[-2,:] ## nM
+    S[-1, :] = Sop ## PSU a function for S with depth 
+
+    ## Glacier wall
+    C[0, :] = C[1,:]
+    C[0, zz] = C0
+    S[0, :] = S[1,:]
+    S[0, zz] = S0
+    return C,S
+
+def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
+    C, S = boundary_steady(C, S, C0, S0, zz,Sop)
+    ## Surface and depth boundary
+    w[:, 0] = w[:, -1] = 0
+    u[:, -1] = u[:, -2]
+    u[:, 0] = u[:, 1]
+    ## Wall boundary
+    w[0, :] = u[0, :] = 0
+    u[0, zz] = u0
+    ## open boundary
+    w[-1, :] = w[-2, :]
+    u[-1, :] = w[-1, :]  
+    return C, S, u, w
+    
+def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
+    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz))
+    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
+    return Cn,Sn
+
+def stepper_motion(dx,dz,dt,C,S,Kx,Kz,u,w):
+    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)) - dt*upstr(C,u,0)/dx  - dt*upstr(C,w,1)/dz
+    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz)) - dt*upstr(S,u,0)/dx - dt*upstr(S,w,1)/dz
+    return Cn,Sn
+
+def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
+    #ML = 10
+    Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
+    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C) #oxidation
+    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) #evasion
+    #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
+    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
+    return Cn,Sn
 
 def diffx(C, dx): 
     n   = C.shape[0];
@@ -86,59 +152,26 @@ def diffz(C,dz):
     Cdz = Cdz.transpose()
     return Cdz
 
-def boundary_steady(C, S, C0, S0, zz ,Sop):
-    '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
-    ## open water boundary
-    C[-1, :] = C[-2,:] ## nM
-    S[-1, :] = Sop ## PSU a function for S with depth 
 
-    ## Glacier wall
-    C[0, :] = C[1,:]
-    C[0, zz] = C0
-    S[0, :] = S[1,:]
-    S[0, zz] = S0
-    return C,S
+def upstr(C,U,ax):
+    adv=np.zeros_like(C)
+    for i in range(0,C.shape[0]-1):
+        for j in range(0,C.shape[1]-1):
+            if ax == 0:
+                if U[i,j]>=0:
+                    adv[i,j] = U[i,j]*(C[i,j] - C[i-1,j])
+                else:
+                    adv[i,j] = abs(U[i,j])*(C[i,j] - C[i+1,j])
+            else:
+                if U[i,j]>=0:
+                    adv[i,j] = U[i,j]*(C[i,j] - C[i,j-1])
+                else:
+                    adv[i,j] = abs(U[i,j])*(C[i,j] - C[i,j+1])
+    return adv
 
-def boundary_motion(C, S, u, w, uo, C0, S0, zz, D):
-    C, S = boundary_steady(C, S, C0, S0, zz)
-    ## Surface and depth boundary
-    w[:, 0] = w[:, D] = 0
-    u[:, -1] = u[:, -2]
-    u[:, 0] = u[:, 1]
-    ## Wall boundary
-    w[0, :] = u[0, :] = 0
-    u[0, zz] = u0
-    ## open boundary
-    w[-1, :] = w[-2, :]
-    u[-1, :] = w[-1, :]  
-    return C, S, u, w
 
-def initial_steady(C, S,Sop):
-    ''' sets the inital conditions for the steady state stages'''
-    C  = 0*C ## 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM  
-    for i in range(S.shape[0]):
-        S[i,:] = Sop # Changed to 33 from 35, closest to actual environmental conditions
-    return C, S
 
-def inital_motion(C, S, u, w):
-    ''' sets initial conditions for motion case '''
-    C, S = initial_steady(C, S)       ## A placeholder until we have a steady field solution. maybe use the steady state stepper
-    u, w = 0                          ## should be set when creating grids anyway
-    return C, S
-    
-def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz))
-    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
-    return Cn,Sn
 
-def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
-    #ML = 10
-    Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
-    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C) #oxidation
-    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) #evasion
-    #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
-    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
-    return Cn,Sn
 
 # def stepgridB(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
 #     '''take a step forward using grid 2 (B)'''
