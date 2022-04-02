@@ -134,8 +134,8 @@ def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
     #ML = 10
     Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
-    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C)
-    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
+    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C) #oxidation
+    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) #evasion
     #Cn[:,0] = C[:,0] + dt*(diffx(C[:,0])*Kx/(dx**2)+Kz*diffz(C[:,0])/(dz**2)-Ro*C[:,0]-Kd/(dz*0.000025)*(C[:,0] - 3.7))
     Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
