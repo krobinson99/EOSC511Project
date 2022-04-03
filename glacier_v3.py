@@ -52,11 +52,11 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
     # main loop (Euler forward)
         for nt in range(1,ntime):
             if steady:
-                C[nt,:,:], S[nt,:,:] = stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:])
+                C[nt,:,:], S[nt,:,:],u[nt,:,:] = stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:],D,Q)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:], u[nt,:,:], w[nt,:,:] = boundary_motion(C[nt,:,:], S[nt,:,:],u[nt,:,:], w[nt,:,:], u0, C0, S0, zz, D, Sop)
         C = C + Cop
-        return C,S
+        return C,S,u
 
 
 def init0(ngridx,ngridz,ntime,motion):
@@ -130,14 +130,20 @@ def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
     Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
 
-def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w):
+def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q):
     Uc,Wc,rhox = grid_mid(u,w,S,dz,dx)
     Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz)
     Sn = S + dt*(diffx(S,dx)*Kx + Kz*diffz(S,dz) - upstr(S,Uc,0)/dx - upstr(S,Wc,1)/dz)
-    un = u + dt*( -upstr(u,u,0)/dx  - upstr(u,w,1)/dz) 
-    return Cn,Sn
+    up = u + dt*( -upstr(u,u,0)/dx  - upstr(u,w,1)/dz -gr*p_grad(rhox,dz)) 
+    q = Q - (np.sum(up,axis=1))/D
+    un = up + np.tile(q, (u.shape[1],1)).T 
+    return Cn,Sn, un
 
-#def pgrad(rhox):
+def p_grad(rhox,dz):
+    pgrad = np.zeros_like(rhox)
+    for j in range(rhox.shape[1]):
+        pgrad[:,j] = 0.5*dz*rhox[:,j] + np.sum(dz*rhox[:,0:j],axis=1)
+    return pgrad
 
 def grid_mid(u,w,S,dz,dx):
     rho = dens(S,dz)
@@ -168,17 +174,6 @@ def matprod(U,val,ind):
     A[0,0:2] = np.array([2*val, 0])
     A[-1,-2:] = np.array([0, 2*val])
     return U[:,ind]@A
-
-def u_mid(U):
-    umid = np.zeros((U.shape[0]+1,U.shape[1]+1))
-    for j in range(U.shape[1]):
-        if j==0:
-            umid[:,j] = matprod(U,0.5,j)
-        if j==U.shape[1]-1:
-            umid[:,j] = matprod(U,0.5,j-1)
-        else:
-            umid[:,j] = matprod(U,0.25,j) + matprod(U,0.25,j-1)
-    return umid
         
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
     #ML = 10
@@ -220,8 +215,8 @@ def diffz(C,dz):
 
 def upstr(C,U,ax):
     adv=np.zeros_like(C)
-    for i in range(0,C.shape[0]):
-        for j in range(0,C.shape[1]):
+    for i in range(0,C.shape[0]-1):
+        for j in range(0,C.shape[1]-1):
             if ax == 0:
                 if U[i,j]>=0:
                     adv[i,j] = U[i,j]*(C[i,j] - C[i-1,j])
@@ -233,29 +228,3 @@ def upstr(C,U,ax):
                 else:
                     adv[i,j] = abs(U[i,j])*(C[i,j] - C[i,j+1])
     return adv
-
-
-
-
-
-# def stepgridB(ngrid, f, g, Hu, Hv, dt, rdx, u, v, eta, up, vp, etap):
-#     '''take a step forward using grid 2 (B)'''
-#     n = ngrid
-#     nm1 = ngrid-1
-#     nm2 = ngrid-2
-#     u[1:nm1, 1:nm1] = u[1:nm1, 1:nm1] + 2*dt * (f * vp[1:nm1, 1:nm1]   #u, v center grid points same as C and S
-#                                                  -g * (etap[2:n, 1:nm1] - etap[1:nm1, 1:nm1]
-#                                                         + etap[2:n, 2:n] - etap[1:nm1, 2:n]) * 0.5 * rdx)
-#     v[1:nm1, 1:nm1] = v[1:nm1, 1:nm1] + 2*dt * (-f*up[1:nm1, 1:nm1]
-#                                                  - g * (etap[1:nm1, 2:n] - etap[1:nm1, 1:nm1]
-#                                                       + etap[2:n, 2:n] - etap[2:n, 1:nm1]) * 0.5 * rdx)
-#     eta[1:nm1, 1:nm1] = eta[1:nm1, 1:nm1] + 2*dt * (-(Hu[1:nm1, 1:nm1] * up[1:nm1, 1:nm1] #eta grid points same as u and w
-#                                                       - Hu[0:nm2, 1:nm1] * up[0:nm2, 1:nm1]
-#                                                          + Hu[1:nm1, 0:nm2] * up[1:nm1, 0:nm2]
-#                                                          - Hu[0:nm2, 0:nm2] * up[0:nm2, 0:nm2]
-#                                                          + Hv[1:nm1, 1:nm1] * vp[1:nm1, 1:nm1]
-#                                                          - Hv[1:nm1, 0:nm2] * vp[1:nm1, 0:nm2]
-#                                                          + Hv[0:nm2, 1:nm1] * vp[0:nm2, 1:nm1]
-#                                                          - Hv[0:nm2, 0:nm2] * vp[0:nm2, 0:nm2]) * 0.5 * rdx)
-#     return u, v, eta
-
