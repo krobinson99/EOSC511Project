@@ -7,6 +7,8 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
     if motion = True motion case for BCs, initial, stepper (eventually) will be used
     '''
     g = 10 
+    rhoc = 1026
+    gr = g/rhoc
     D = 200            # depth of our domain in x direction [m]
     L = 20e3           # length of our domain in x direction [m]
     C0 = 10           # input concentration of methane          NOT TRUE
@@ -47,10 +49,11 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
         u, w, rho, S, C  = init0(ngridx,ngridz,ntime,motion)
         S[0,:,:] = initial(S[0,:,:],Sop,dz)
         C[0,:,:], S[0,:,:], u[0,:,:], w[0,:,:] = boundary_motion(C[0,:,:], S[0,:,:],u[0,:,:], w[0,:,:], u0, C0, S0, zz, D, Sop)
-        # main loop (Euler forward)
+    # main loop (Euler forward)
         for nt in range(1,ntime):
             if steady:
-                C[nt,:,:], S[nt,:,:] = stepper_motion(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:])
+                C[nt,:,:], S[nt,:,:] = stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:])
+    # periodic boundary conditions
             C[nt,:,:], S[nt,:,:], u[nt,:,:], w[nt,:,:] = boundary_motion(C[nt,:,:], S[nt,:,:],u[nt,:,:], w[nt,:,:], u0, C0, S0, zz, D, Sop)
         C = C + Cop
         return C,S
@@ -79,8 +82,6 @@ def initial(S,Sop,dz,motion=False):
         return S,rho
     else:
         return S
-
-    return S
 
 def dens(S,dz):
     a0 = 1.665e-1
@@ -129,14 +130,34 @@ def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
     Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
 
-def stepper_motion(dx,dz,dt,C,S,Kx,Kz,u,w):
-    Uc = u_mid(u)
-    Wc = u_mid(w)
+def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w):
+    Uc,Wc,rhox = grid_mid(u,w,S,dz,dx)
     Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz)
     Sn = S + dt*(diffx(S,dx)*Kx + Kz*diffz(S,dz) - upstr(S,Uc,0)/dx - upstr(S,Wc,1)/dz)
-    rhon = dens(S,dz)
-    #un = u + dt*( -upstr(u,u,0)/dx  - upstr(u,w,1)/dz)
+    un = u + dt*( -upstr(u,u,0)/dx  - upstr(u,w,1)/dz) 
     return Cn,Sn
+
+#def pgrad(rhox):
+
+def grid_mid(u,w,S,dz,dx):
+    rho = dens(S,dz)
+    rhox = np.zeros_like(u)
+    uc = np.zeros_like(rho)
+    wc = np.zeros_like(rho)
+    for j in range(rho.shape[1]):
+        if j==0:
+            uc[:,j] = matprod(u,0.5,j)
+            wc[:,j] = matprod(w,0.5,j)
+        if j==u.shape[1]:
+            uc[:,j] = matprod(u,0.5,j-1)
+        else:
+            uc[:,j] = matprod(u,0.25,j) + matprod(u,0.25,j-1)
+            wc[:,j] = matprod(w,0.25,j) + matprod(w,0.25,j-1)
+        for i in range(rho.shape[0]):
+            if i < rho.shape[0]-1 and j < rho.shape[1]-1:
+                rhox[i,j] = ((rho[i,j]+rho[i,j+1])/2 - (rho[i+1,j]+rho[i+1,j+1])/2)/dx
+                
+    return uc,wc,rhox
 
 def matprod(U,val,ind):
     n = U.shape[0]
@@ -159,7 +180,6 @@ def u_mid(U):
             umid[:,j] = matprod(U,0.25,j) + matprod(U,0.25,j-1)
     return umid
         
-
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
     #ML = 10
     Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
@@ -197,7 +217,6 @@ def diffz(C,dz):
     Cdz = A@C.transpose()
     Cdz = Cdz.transpose()
     return Cdz
-
 
 def upstr(C,U,ax):
     adv=np.zeros_like(C)
