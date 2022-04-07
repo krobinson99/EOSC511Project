@@ -4,32 +4,35 @@ import numpy as np
 from scipy.sparse import spdiags
 
 def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = True):  # return eta
-    '''recommended values ngridx=50, ngridz = 20, dt=200, T=10*86400 (10 days)
-    if motion = True motion case for BCs, initial, stepper (eventually) will be used
+    '''recommended values ngridx=50, ngridz = 20, dt=60, zinput=0 (unstable if motion=True at other depths), T=5*86400 (5 days),
+    ML at least dz, alpha=0.4/86400.
+    examples: 
+    C,S,u,w = glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = True,steady=false)
+    C,S= glacier(ngridx, ngridz, dt, zinput, T, ML, alpha,steady=False)
     '''
-    g = 10 
-    rhoc = 1026
-    gr = g/rhoc
-    D = 200            # depth of our domain in x direction [m]
-    L = 20e3           # length of our domain in x direction [m]
-    C0 = 10           # input concentration of methane          NOT TRUE
-    S0 = 0             # Input concentration of salinity 
-    dx = L/(ngridx)
-    dz = D/(ngridz)
-    Q = 5e-4              # inflow at glacier wall m/s
-    u0 = Q * (D/(2*dz))     # for 20 ngrid : 0.005m/s 
-    zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
-    Kx= 5 * L/dx
-    Kz= 1e-4 * D/dz
-    Ah= 2 * L/dx
-    Av= 1e-3 * D/dz
-    #alpha =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
+    g = 10              # gravity
+    rhoc = 1026         # standard density sw
+    gr = g/rhoc        
+    D = 200             # depth of our domain [m]
+    L = 20e3            # length of our domain in x direction [m]
+    C0 = 10             # input concentration of methane          NOT TRUE
+    S0 = 0              # Input concentration of salinity 
+    dx = L/(ngridx)     # spatial resolution x direction
+    dz = D/(ngridz)     # spatial resolution z direction
+    Q = 5e-4            # inflow at glacier wall m/s
+    u0 = Q * (D/(2*dz)) # velocity inflow                          NOT WORKING
+    zz = int(zinput/dz) # *** Scale so input height matches grid *** 
+    Kx= 5 * L/dx        # diffusivity coeff x direction
+    Kz= 1e-4 * D/dz     # diffusivity coeff z direction
+    Ah= 2 * L/dx        # eddy horizontal diff coeff 
+    Av= 1e-3 * D/dz     # eddy vertical diff coeff 
+    #alpha =  0.4/86400 # Oxidation rate constant (0.4 day^-1, converted to seconds).
     mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
     Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
     #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
     zn = np.linspace(0,D,ngridz+1)
-    Sop = 33 #+ np.log(1e-3+zn/D)
-    Cop = 3.7
+    Sop = 33 #+ np.log(1e-3+zn/D) #initial condition of salinity
+    Cop = 3.7                     #[ch4] at equilibrium with atmosphere
 # set up temporal scale T is total run time
     ntime = int(T/dt)
     if motion==False:
@@ -40,9 +43,9 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
     # main loop (Euler forward)
         for nt in range(1,ntime):
             if steady:
-                C[nt,:,:], S[nt,:,:] = stepper_steady(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz)
-            else:
                 C[nt,:,:], S[nt,:,:] = stepper_sink(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,alpha,Kd,ngridz,ML)
+            else:
+                C[nt,:,:], S[nt,:,:] = stepper_sink(dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,alpha,Kd,ngridz,ML,steady)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:] = boundary_steady(C[nt,:,:], S[nt,:,:], C0, S0,zz,Sop)
         C = C + Cop
@@ -54,8 +57,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
         C[0,:,:], S[0,:,:], u[0,:,:], w[0,:,:] = boundary_motion(C[0,:,:], S[0,:,:],u[0,:,:], w[0,:,:], u0, C0, S0, zz, D, Sop)
     # main loop (Euler forward)
         for nt in range(1,ntime):
-            if steady:
-                C[nt,:,:], S[nt,:,:],u[nt,:,:],w[nt,:,:]= stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:],D,Q,Ah,Av,alpha,ML,Kd)
+            C[nt,:,:], S[nt,:,:],u[nt,:,:],w[nt,:,:]= stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:],D,Q,Ah,Av,alpha,ML,Kd,steady)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:], u[nt,:,:], w[nt,:,:] = boundary_motion(C[nt,:,:], S[nt,:,:],u[nt,:,:], w[nt,:,:], u0, C0, S0, zz, D, Sop)
         C = C + Cop
@@ -120,7 +122,7 @@ def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
     C, S = boundary_steady(C, S, C0, S0, zz,Sop)
     ## Surface and bottom boundary
     w[:, 0] = w[:, -1] = 0
-    u[:, -1] = 0#u[:, -2]
+    u[:, -1] = 0 #u[:, -2] #With friction we get no flow boundary
     u[:, 0] = u[:, 1]  #overwrites velocities surface!!!!
     ## Wall boundary
     u[0, :] = 0
@@ -134,23 +136,24 @@ def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
     u[-1, :] = u[-2, :]  
     return C, S, u, w
     
-def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
-    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz))
-    Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
-    return Cn,Sn
-    
-def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
-    Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
-    Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C) #oxidation
-    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) #evasion
+def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML,steady=True):
+    if steady:
+        Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz))
+    else:
+        Dp = int(ML/(ngridz-1))   ## space step closest to mixing layer for MLayer = 20m
+        Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz)-alpha*C) #oxidation
+        Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp])) #evasion
     Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
 
-def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd):
+def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd,steady):
     Dp = int(ML/(C.shape[1]))
     Uc,Wc,rhox = grid_mid(u,w,S,dz,dx)
-    Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz -alpha*C)
-    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
+    if steady:
+        Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz)
+    else:
+        Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz -alpha*C)
+        Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
     Sn = S + dt*(diffx(S,dx)*Kx + Kz*diffz(S,dz) - upstr(S,Uc,0)/dx - upstr(S,Wc,1)/dz)
     z = np.arange(0,u.shape[1]*dz,dz)
     Z=np.tile(z, (u.shape[0],1)) 
