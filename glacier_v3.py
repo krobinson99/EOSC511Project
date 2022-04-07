@@ -84,6 +84,7 @@ def initial(S,Sop,dz,motion=False):
     return S
 
 def dens(S,dz):
+    '''Calculates density field from S field'''
     a0 = 1.665e-1
     b0 = 7.6554e-1
     lam1 = 5.952e-2
@@ -119,6 +120,7 @@ def boundary_steady(C, S, C0, S0, zz ,Sop):
     return C,S
 
 def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
+    '''Apply boundary conditions to C,S,u,w'''
     C, S = boundary_steady(C, S, C0, S0, zz,Sop)
     ## Surface and bottom boundary
     w[:, 0] = w[:, -1] = 0
@@ -137,6 +139,7 @@ def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
     return C, S, u, w
     
 def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML,steady=True):
+    '''Calculates next timestep of C,S for no motion case'''
     if steady:
         Cn = C + dt*(diffx(C,dx)*Kx+Kz*diffz(C,dz))
     else:
@@ -147,6 +150,7 @@ def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML,steady=True):
     return Cn,Sn
 
 def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd,steady):
+    '''Calculates next timestep of C,S,u,w'''
     Dp = int(ML/(C.shape[1]))
     Uc,Wc,rhox = grid_mid(u,w,S,dz,dx)
     if steady:
@@ -164,6 +168,7 @@ def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd,steady):
     return Cn,Sn,un,wn
 
 def vert_vel(u,dz,dx):
+    '''Calculates w from u using the continuity equation and forward euler method'''
     w = np.zeros_like(u)
     for i in range(u.shape[0]-3,0,-1):
         for j in range(u.shape[1]-2,0,-1):
@@ -171,12 +176,14 @@ def vert_vel(u,dz,dx):
     return w
 
 def p_grad(rhox,dz):
+    '''Calculates the pressure gradient field from rhox'''
     pgrad = np.zeros_like(rhox)
     for j in range(rhox.shape[1]):
         pgrad[:,j] = 0.5*dz*rhox[:,j] + np.sum(dz*rhox[:,0:j],axis=1)
     return pgrad
 
 def grid_mid(u,w,S,dz,dx):
+    '''This function calculates u and w values at the gridpoints for C and S and rhox at the u and w gridpoints.'''
     rho = dens(S,dz)
     rhox = np.zeros_like(u)
     uc = np.zeros_like(rho)
@@ -197,6 +204,7 @@ def grid_mid(u,w,S,dz,dx):
     return uc,wc,rhox
 
 def matprod(U,val,ind):
+    '''used to calculate value of u and w at gridpoints.'''
     n = U.shape[0]
     e = np.ones([1,n])
     dat = np.vstack((val*e,val*e)) 
@@ -207,6 +215,8 @@ def matprod(U,val,ind):
     return U[:,ind]@A
         
 def diffx(C, dx): 
+    '''Calculates second derivative of C in x direction using centered difference in the interior and forward and backward difference
+    in x=0 and x=L boundaries.'''
     n   = C.shape[0];
     e   = np.ones([1,n])
     dat = np.vstack((e,-2*e,e))/(dx**2)# Centered difference approximation, second derivative.
@@ -221,6 +231,8 @@ def diffx(C, dx):
     return Cdx
 
 def diffz(C,dz): 
+    '''Calculates second derivative of C in z direction using centered difference in the interior and forward and backward difference
+    in the surface and bottom boundaries.'''
     n   = C.shape[1];
     e   = np.ones([1,n])
     dat = np.vstack((e,-2*e,e))/(dz**2) # Centered difference, second derivative
@@ -236,6 +248,8 @@ def diffz(C,dz):
     return Cdz
 
 def upstr(C,U,ax):
+    '''Calculates conditional upstream method advection for C and velocity u. ax determines the direction of advection, if ax==1 
+    it will calculate vertical advection '''
     adv=np.zeros_like(C)
     for i in range(0,C.shape[0]-1):
         for j in range(0,C.shape[1]-1):
