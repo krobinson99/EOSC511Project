@@ -21,8 +21,8 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
     Kz= 1e-4 * D/dz
-    Ah= 2
-    Av= 1e-3
+    Ah= 2 * L/dx
+    Av= 1e-3 * D/dz
     #alpha =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
     mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
     Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
@@ -120,7 +120,7 @@ def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
     C, S = boundary_steady(C, S, C0, S0, zz,Sop)
     ## Surface and bottom boundary
     w[:, 0] = w[:, -1] = 0
-    u[:, -1] = u[:, -2]
+    u[:, -1] = 0#u[:, -2]
     u[:, 0] = u[:, 1]  #overwrites velocities surface!!!!
     ## Wall boundary
     u[0, :] = 0
@@ -154,7 +154,7 @@ def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd):
     Sn = S + dt*(diffx(S,dx)*Kx + Kz*diffz(S,dz) - upstr(S,Uc,0)/dx - upstr(S,Wc,1)/dz)
     z = np.arange(0,u.shape[1]*dz,dz)
     Z=np.tile(z, (u.shape[0],1)) 
-    un =  u - dt*(gr*p_grad(rhox,dz) + upstr(u,u,0)/dx  + upstr(u,w,1)/dz)  +dt*(diffx(u,dx)*Ah + Av*diffz(u,dz))
+    un =  u + dt*(diffx(u,dx)*Ah + diffz(u,dz)*Av -gr*p_grad(rhox,dz) - upstr(u,u,0)/dx  - upstr(u,w,1)/dz) 
     q = Q - (np.sum(un*dz,axis=1))/D
     un = un + np.tile(q, (u.shape[1],1)).T 
     wn = vert_vel(un,dz,dx)
