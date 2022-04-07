@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from curses import A_HORIZONTAL
 import numpy as np
 from scipy.sparse import spdiags
 
@@ -19,13 +20,15 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
     u0 = Q * (D/(2*dz))     # for 20 ngrid : 0.005m/s 
     zz = int(zinput/dz)        # *** Scale so input height matches grid *** 
     Kx= 5 * L/dx
-    Kz= 1e-4#1e-5#1e-4 * D/dz
+    Kz= 1e-4 * D/dz
+    Ah= 2
+    Av= 1e-3
     #alpha =  0.4/86400    # Oxidation rate constant (0.4 day^-1, converted to seconds).
     mu = 0.00183       # Dynamic viscosity of water at 1 C [m2/s]
     Kd = 0.0087e-5      # molecular diffusivity of methane at 4C in seawater (couldn't find for 1C) [m2/s]
     #Sc = mu/(Kd*rho)    # Schmidt number for water at 1 C.
     zn = np.linspace(0,D,ngridz+1)
-    Sop = 33 + np.log(1e-3+zn/D)
+    Sop = 33 #+ np.log(1e-3+zn/D)
     Cop = 3.7
 # set up temporal scale T is total run time
     ntime = int(T/dt)
@@ -46,21 +49,18 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
         return C,S
     if motion:
     # initialize
-        u, w, rho, S, C  = init0(ngridx,ngridz,ntime,motion)
+        u, w, S, C,rhox = init0(ngridx,ngridz,ntime,motion)
         S[0,:,:] = initial(S[0,:,:],Sop,dz)
         C[0,:,:], S[0,:,:], u[0,:,:], w[0,:,:] = boundary_motion(C[0,:,:], S[0,:,:],u[0,:,:], w[0,:,:], u0, C0, S0, zz, D, Sop)
     # main loop (Euler forward)
         for nt in range(1,ntime):
             if steady:
-                C[nt,:,:], S[nt,:,:],u[nt,:,:],w[nt,:,:]= stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:],D,Q,u0)
+                C[nt,:,:], S[nt,:,:],u[nt,:,:],w[nt,:,:]= stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:],D,Q,Ah,Av,alpha,ML,Kd)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:], u[nt,:,:], w[nt,:,:] = boundary_motion(C[nt,:,:], S[nt,:,:],u[nt,:,:], w[nt,:,:], u0, C0, S0, zz, D, Sop)
-            q = Q - (np.sum(u[nt,:,:]*dz,axis=1))/D
-            u[nt,:,:] = u[nt,:,:] + np.tile(q, (u[0,:,:].shape[1],1)).T 
-            u[nt,0, :] = 0
-            u[nt,0, zz-1:zz] = u0  
+            #w[nt,:,:] = vert_vel(u[nt,:,:],dz,dx)
         C = C + Cop
-        return C,S,u,w
+        return C,S,u,w,rhox
 
 
 def init0(ngridx,ngridz,ntime,motion):
@@ -71,8 +71,8 @@ def init0(ngridx,ngridz,ntime,motion):
     if motion:
         u = np.zeros((ntime,ngridx, ngridz))
         w = np.zeros_like(u)
-        rho = np.zeros_like(S)
-        return  u, w, rho, S, C 
+        rhox = np.zeros_like(u)
+        return  u, w, S, C ,rhox
     else:
         return  C, S 
     
@@ -81,11 +81,7 @@ def initial(S,Sop,dz,motion=False):
     #C  = 0*C ## 3.7*C # Changed from 4.5 to 3.7 because solubility of methane at 33 PSU and 0.5 C (closest to our conditions) is 3.7 nM  
     for i in range(S.shape[0]):
         S[i,:] = Sop # Changed to 33 from 35, closest to actual environmental conditions
-    if motion:
-        rho = dens(S)
-        return S,rho
-    else:
-        return S
+    return S
 
 def dens(S,dz):
     a0 = 1.665e-1
@@ -106,13 +102,20 @@ def boundary_steady(C, S, C0, S0, zz ,Sop):
     '''Sets the boundary conditions for the steady state if motion = False, boundaries for motion case if true'''
     ## open water boundary
     C[-1, :] = C[-2,:] ## nM
-    S[-1, :] = Sop ## PSU a function for S with depth 
-
+    S[-1, :] = S[-2, :] ## PSU a function for S with depth 
+    #surface
+    C[:, 0] = C[:,1] 
+    S[:, 0] = S[:,1] 
+    #Bottom
+    C[:, -1] = C[:,-2] 
+    S[:, -1] = S[:,-2] 
     ## Glacier wall
     C[0, :] = C[1,:]
     C[0, zz] = C0
+    C[1, zz] = (C0 + C[2, zz])/2
     S[0, :] = S[1,:]
     S[0, zz] = S0
+    S[1, zz] = (S0 + S[2, zz])/2
     return C,S
 
 def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
@@ -120,17 +123,17 @@ def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
     ## Surface and bottom boundary
     w[:, 0] = w[:, -1] = 0
     u[:, -1] = u[:, -2]
-    u[:, 0] = u[:, 1]
+    u[:, 0] = u[:, 1]  #overwrites velocities surface!!!!
     ## Wall boundary
     u[0, :] = 0
-    w[0, :] = w[1, :]
-    if zz == 0:
-         u[0, zz] = 2*u0 
-    else:
-        u[0, zz-1:zz] = u0     #inflow over two points (allows us to calculate flow at gridpoint C,S)
+    #w[0, :] = w[1, :]
+    #if zz == 0:
+    #     u[0, zz] = 2*u0 
+    #else:
+    #    u[0, zz-1:zz+1] = u0     #inflow over two points (allows us to calculate flow at gridpoint C,S)
     ## open boundary
     w[-1, :] = w[-2, :]
-    u[-1, :] = w[-1, :]  
+    u[-1, :] = u[-2, :]  
     return C, S, u, w
     
 def stepper_steady(dx,dz,dt,C,S,Kx,Kz):
@@ -145,18 +148,25 @@ def stepper_sink(dx,dz,dt,C,S,Kx,Kz,alpha,Kd,ngridz,ML):
     Sn = S + dt*(diffx(S,dx)*Kx+Kz*diffz(S,dz))
     return Cn,Sn
 
-def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,u0):
+def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd):
+    Dp = int(ML/(C.shape[1]))
     Uc,Wc,rhox = grid_mid(u,w,S,dz,dx)
-    Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz)
+    Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz -alpha*C)
+    Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
     Sn = S + dt*(diffx(S,dx)*Kx + Kz*diffz(S,dz) - upstr(S,Uc,0)/dx - upstr(S,Wc,1)/dz)
-    wp = vert_vel(u,dz,dx)
-    un = u + dt*( -upstr(u,u,0)/dx  - upstr(u,wp,1)/dz -gr*p_grad(rhox,dz))  
+    #wp = vert_vel(u,dz,dx)
+    z = np.arange(0,u.shape[1]*dz,dz)
+    Z=np.tile(z, (u.shape[0],1)) 
+    un =  u - dt*(gr*p_grad(rhox,dz) + upstr(u,u,0)/dx  + upstr(u,w,1)/dz)  +dt*(diffx(u,dx)*Ah + Av*diffz(u,dz))
+    q = Q - (np.sum(un*dz,axis=1))/D
+    un = un + np.tile(q, (u.shape[1],1)).T 
     wn = vert_vel(un,dz,dx)
-    return Cn,Sn, un,wn
+    return Cn,Sn,un,wn
 
 def vert_vel(u,dz,dx):
     w = np.zeros_like(u)
-    for i in range(1,u.shape[0]-1):
+    for i in range(u.shape[0]-3,0,-1):
+        #print(u[i+1,:])
         for j in range(u.shape[1]-2,0,-1):
             w[i,j] = w[i,j+1] + (dz/dx)*(u[i+1,j]-u[i,j])
     return w
@@ -181,9 +191,9 @@ def grid_mid(u,w,S,dz,dx):
         else:
             uc[:,j] = matprod(u,0.25,j) + matprod(u,0.25,j-1)
             wc[:,j] = matprod(w,0.25,j) + matprod(w,0.25,j-1)
-        for i in range(rho.shape[0]):
+        for i in range(1,rho.shape[0]):
             if i < rho.shape[0]-1 and j < rho.shape[1]-1:
-                rhox[i,j] = ((rho[i,j]+rho[i,j+1])/2 - (rho[i+1,j]+rho[i+1,j+1])/2)/dx
+                rhox[i,j] = ((rho[i+1,j]+rho[i+1,j+1])/2 - (rho[i,j]+rho[i,j+1])/2)/dx
                 
     return uc,wc,rhox
 
