@@ -49,7 +49,7 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
         return C,S
     if motion:
     # initialize
-        u, w, S, C,rhox = init0(ngridx,ngridz,ntime,motion)
+        u, w, S, C = init0(ngridx,ngridz,ntime,motion)
         S[0,:,:] = initial(S[0,:,:],Sop,dz)
         C[0,:,:], S[0,:,:], u[0,:,:], w[0,:,:] = boundary_motion(C[0,:,:], S[0,:,:],u[0,:,:], w[0,:,:], u0, C0, S0, zz, D, Sop)
     # main loop (Euler forward)
@@ -58,9 +58,8 @@ def glacier(ngridx, ngridz, dt, zinput, T, ML, alpha, motion = False, steady = T
                 C[nt,:,:], S[nt,:,:],u[nt,:,:],w[nt,:,:]= stepper_motion(gr,dx,dz,dt,C[nt-1,:,:],S[nt-1,:,:],Kx,Kz,u[nt-1,:,:],w[nt-1,:,:],D,Q,Ah,Av,alpha,ML,Kd)
     # periodic boundary conditions
             C[nt,:,:], S[nt,:,:], u[nt,:,:], w[nt,:,:] = boundary_motion(C[nt,:,:], S[nt,:,:],u[nt,:,:], w[nt,:,:], u0, C0, S0, zz, D, Sop)
-            #w[nt,:,:] = vert_vel(u[nt,:,:],dz,dx)
         C = C + Cop
-        return C,S,u,w,rhox
+        return C,S,u,w
 
 
 def init0(ngridx,ngridz,ntime,motion):
@@ -71,8 +70,7 @@ def init0(ngridx,ngridz,ntime,motion):
     if motion:
         u = np.zeros((ntime,ngridx, ngridz))
         w = np.zeros_like(u)
-        rhox = np.zeros_like(u)
-        return  u, w, S, C ,rhox
+        return  u, w, S, C
     else:
         return  C, S 
     
@@ -126,7 +124,7 @@ def boundary_motion(C, S, u, w, u0, C0, S0, zz, D,Sop):
     u[:, 0] = u[:, 1]  #overwrites velocities surface!!!!
     ## Wall boundary
     u[0, :] = 0
-    #w[0, :] = w[1, :]
+    w[0, :] = 0#w[1, :]
     #if zz == 0:
     #     u[0, zz] = 2*u0 
     #else:
@@ -154,7 +152,6 @@ def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd):
     Cn = C + dt*(diffx(C,dx)*Kx + Kz*diffz(C,dz) - upstr(C,Uc,0)/dx  - upstr(C,Wc,1)/dz -alpha*C)
     Cn[:,0:Dp] = Cn[:, 0:Dp] -dt*(Kd/(ML*0.000025)*(C[:,0:Dp]))
     Sn = S + dt*(diffx(S,dx)*Kx + Kz*diffz(S,dz) - upstr(S,Uc,0)/dx - upstr(S,Wc,1)/dz)
-    #wp = vert_vel(u,dz,dx)
     z = np.arange(0,u.shape[1]*dz,dz)
     Z=np.tile(z, (u.shape[0],1)) 
     un =  u - dt*(gr*p_grad(rhox,dz) + upstr(u,u,0)/dx  + upstr(u,w,1)/dz)  +dt*(diffx(u,dx)*Ah + Av*diffz(u,dz))
@@ -166,7 +163,6 @@ def stepper_motion(gr,dx,dz,dt,C,S,Kx,Kz,u,w,D,Q,Ah,Av,alpha,ML,Kd):
 def vert_vel(u,dz,dx):
     w = np.zeros_like(u)
     for i in range(u.shape[0]-3,0,-1):
-        #print(u[i+1,:])
         for j in range(u.shape[1]-2,0,-1):
             w[i,j] = w[i,j+1] + (dz/dx)*(u[i+1,j]-u[i,j])
     return w
