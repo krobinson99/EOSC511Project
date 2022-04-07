@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from curses import A_HORIZONTAL
 import numpy as np
 from scipy.sparse import spdiags
 
